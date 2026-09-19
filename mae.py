@@ -16,6 +16,7 @@ class MAE(nn.Module):
         head_size,
         patch_size, # p
         input_size, # c, h, w
+        device,
         ):
         super().__init__()
         c, h, w = input_size
@@ -53,6 +54,8 @@ class MAE(nn.Module):
 
         ### loss fn
         self.loss = nn.MSELoss()
+
+        self.device = device
 
     def patchify(self, x):
         temp = int(np.sqrt(self.num_patches))
@@ -92,16 +95,16 @@ class MAE(nn.Module):
         all_embeddings = torch.cat([masked_emb, shared_masked_emb], axis=1)
         
         shuffled_ind = np.argsort(shuffled_ind)
-        unshuffled_emb = torch.gather(all_embeddings, 1, torch.tensor(shuffled_ind).unsqueeze(0).unsqueeze(-1).repeat(n, 1, input_dim))
+        unshuffled_emb = torch.gather(all_embeddings, 1, torch.tensor(shuffled_ind).unsqueeze(0).unsqueeze(-1).repeat(n, 1, input_dim).to(self.device))
         
         unshuffle_emb = torch.cat([cls_token.unsqueeze(1), unshuffled_emb], axis=1)
         return unshuffle_emb
 
     def loss_compute(self, inp_patches, op_patches, masked_idx):
-        op_patches_mean = torch.mean(op_patches, -1, keepdim=True)
-        op_patches_var = torch.var(op_patches, -1, keepdim=True)
+        inp_patches_mean = torch.mean(inp_patches, -1, keepdim=True)
+        inp_patches_var = torch.var(inp_patches, -1, keepdim=True)
 
-        op_patches = (op_patches - op_patches_mean)/op_patches_var**0.5
+        inp_patches = (inp_patches - inp_patches_mean)/(inp_patches_var + 1e-6)**0.5
 
         masked_inp_patches = inp_patches[:, masked_idx, :]
         masked_op_patches = op_patches[:, masked_idx, :]
@@ -146,5 +149,5 @@ class MAE(nn.Module):
         #loss compute
         batch_loss = self.loss_compute(image_patches, output_, masked_idx)
 
-        return batch_loss
+        return batch_loss, output_
     

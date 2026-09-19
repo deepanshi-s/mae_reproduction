@@ -63,9 +63,9 @@ class FeedForward(nn.Module):
         super().__init__()
         self.layernorm = nn.LayerNorm(num_emb)
         self.block = nn.Sequential(
-            nn.Linear(num_emb, num_emb // 4),
+            nn.Linear(num_emb, num_emb * 4),
             nn.ReLU(),
-            nn.Linear(num_emb // 4, num_emb),
+            nn.Linear(num_emb * 4, num_emb),
         )
 
     def forward(self, x):
