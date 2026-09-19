@@ -1,0 +1,22 @@
+num_emb_encoder : 1024
+encoder_num_heads : 8
+head_size : 128
+encoder_num_blocks: 8
+decoder_num_blocks: 4
+decoder_num_heads: 4
+num_emb_decoder: 512
+patch_size: 16
+input_size: [3, 224, 224]
+
+dataset_dir: /home/deepanshi_ubuntu_22_04/imagenet_100
+train_folder: train
+val_folder: val
+
+batch_size: 64
+loss_iters: 100
+max_lr: 0.0006 #6e-4
+min_lr: 0.000001 #1e-6
+weight_decay: 0.05
+num_mini_batch: 16
+max_iter: 409600
+val_loss_compute_step: 8000
