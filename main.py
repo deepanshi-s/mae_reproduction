@@ -29,7 +29,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--wandb_id",
         type=str,
-        required=True,
+        default=WANDB_API_KEY,
     )
     parser.add_argument(
         "--model_save_path",
