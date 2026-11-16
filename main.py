@@ -34,7 +34,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--model_save_path",
         type=str,
-        default="experimental/deepanshi/mae_reproduction/trained_models/mae_checkpoint.pt",
+        default="trained_models/mae_checkpoint.pt",
     )
     parser.add_argument(
         "--load_from_ckpt",
@@ -79,7 +79,7 @@ def get_val_loss(
 
 
 def main(args):
-    config_file = "experimental/deepanshi/mae_reproduction/configs.yaml"
+    config_file = "configs.yaml"
     _workspace = os.environ.get("BUILD_WORKSPACE_DIRECTORY", os.getcwd())
 
     with open(os.path.join(_workspace, config_file), 'r') as file:
