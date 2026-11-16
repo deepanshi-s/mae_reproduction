@@ -1,0 +1,14 @@
+torch==2.8.0
+torchvision==0.23.0   # the version that pairs with torch 2.8
+numpy
+pandas
+pyarrow
+pillow
+matplotlib
+scipy
+scikit-learn
+torchmetrics
+pyyaml
+loguru
+wandb
+tiktoken
