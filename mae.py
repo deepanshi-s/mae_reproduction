@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 import torch.nn as nn
-from mae_reproduction.vit import Block
+from vit import Block
 from loguru import logger
     
 

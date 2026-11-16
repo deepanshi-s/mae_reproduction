@@ -6,9 +6,9 @@ from loguru import logger
 from torch import optim
 import wandb
 
-from mae_reproduction.mae import MAE
-from mae_reproduction.dataloader import get_dataloaders
-from mae_reproduction.utils import (
+from mae import MAE
+from dataloader import get_dataloaders
+from utils import (
     separate_weight_decay_weights,
     lrScheduler,
 )
