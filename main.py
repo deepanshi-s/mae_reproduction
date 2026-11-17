@@ -177,6 +177,8 @@ def main(args):
                 "warmup_steps": peak_warmup_iter//num_mini_batch,
             },
         )
+        run.define_metric("opt_step")
+        run.define_metric("*", step_metric="opt_step")
 
     #separte out weight decay params
     weight_decay_params, non_weight_decay_params = separate_weight_decay_weights(training_model)
@@ -258,6 +260,7 @@ def main(args):
                         {
                             "train_loss": global_loss.item(),
                             "lr_weighted_decay": current_lrs[0],
+                            "opt_step": opt_step,
                         }
                     )
             else:
@@ -265,6 +268,7 @@ def main(args):
                     {
                         "train_loss": mini_batch_running_loss.item(),
                         "lr_weighted_decay": current_lrs[0],
+                        "opt_step": opt_step,
                     }
                 )
             mini_batch_running_loss = 0.0
@@ -288,6 +292,7 @@ def main(args):
                     run.log(
                         {
                             "val_loss": global_val_loss.item(),
+                            "opt_step": opt_step,
                         }
                     )
                 val_loss = global_val_loss
@@ -296,6 +301,7 @@ def main(args):
                 run.log(
                     {
                         "val_loss": val_loss.item(),
+                        "opt_step": opt_step,
                     }
                 )
                             
