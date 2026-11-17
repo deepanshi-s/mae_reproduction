@@ -11,6 +11,7 @@ from PIL import Image
 import time
 import torchvision.transforms.functional as F
 from torchvision.transforms import *
+from torch.utils.data.distributed import DistributedSampler
 
 imagenet_mean = np.array([0.485, 0.456, 0.406])
 imagenet_std =  np.array([0.229, 0.224, 0.225])
@@ -70,12 +71,21 @@ def init_transforms():
     ])
     return train_transforms, val_transforms
 
-def get_dataloaders(dataset_dir, train_folder, val_folder, batch_size):
+def get_dataloaders(dataset_dir, train_folder, val_folder, batch_size, is_distributed):
     train_transforms, val_transforms = init_transforms()
     train_dataset = Imagenet100(dataset_dir, train_folder, train_transforms)
     val_dataset = Imagenet100(dataset_dir, val_folder, val_transforms)
 
-    train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=4)
-    val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True, num_workers=4)
+    if is_distributed:
+        train_distributed = DistributedSampler(train_dataset)
+        val_distrbuted = DistributedSampler(val_dataset)
+        shuffle = False
+    else:
+        train_distributed = None
+        val_distrbuted = None
+        shuffle = True
+
+    train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=shuffle, num_workers=4, sampler=train_distributed)
+    val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=shuffle, num_workers=4, sampler=val_distrbuted)
 
     return train_dataloader, val_dataloader

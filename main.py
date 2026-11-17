@@ -43,6 +43,12 @@ def parse_args() -> argparse.Namespace:
         "--load_from_ckpt",
         type=str,
     )
+    parser.add_argument(
+        "--is_distributed",
+        action="store_true",
+        default=False,
+        help="If the training is multi gpu"
+    )
 
     return parser.parse_args()
 
@@ -59,9 +65,14 @@ def get_val_loss(
         mae_model, 
         val_dataloader,
         device, 
-        loss_iters
+        loss_iters,
+        is_distributed,
     ):
     val_loss = 0.0
+    curr_epoch = 0
+
+    if is_distributed:
+        val_dataloader.sampler.set_epoch(curr_epoch)
     val_dataloader_iter = iter(val_dataloader)
 
     mae_model.eval()
@@ -70,6 +81,9 @@ def get_val_loss(
             batch = next(val_dataloader_iter)
         except StopIteration:
             #logger.info(f'val dataloader exhaused, resetting')
+            curr_epoch += 1
+            if is_distributed:
+                val_dataloader.sampler.set_epoch(curr_epoch)
             val_dataloader_iter = iter(val_dataloader)
             batch = next(val_dataloader_iter)
 
@@ -91,9 +105,15 @@ def main(args):
     logger.info(config)
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    dist.init_process_group("nccl")       
-    local_rank = int(os.environ["LOCAL_RANK"])
-    torch.cuda.set_device(local_rank)
+
+    if args.is_distributed:
+        dist.init_process_group("nccl")       
+        local_rank = int(os.environ["LOCAL_RANK"])
+        torch.cuda.set_device(local_rank)
+        world_size = int(os.environ["WORLD_SIZE"])
+    else:
+        world_size = 1
+        local_rank = 0
 
     mae_model = MAE(encoder_num_blocks=config['encoder_num_blocks'],
         decoder_num_blocks=config['decoder_num_blocks'],
@@ -106,41 +126,54 @@ def main(args):
         input_size=config['input_size'],
         device=device,
     )
-    
-    ddp_model = DDP(mae_model.to(local_rank), device_ids=[local_rank])
+    if args.is_distributed:
+        training_model = DDP(mae_model.to(local_rank), device_ids=[local_rank])
+    else:
+        training_model = mae_model.to(device)
 
     if args.load_from_ckpt:
         model_load_path = os.path.join(_workspace, args.load_from_ckpt)
         checkpoint = torch.load(model_load_path)
-        mae_model.load_state_dict(checkpoint['model_state_dict'], strict=False)
+        training_model.load_state_dict(checkpoint['model_state_dict'], strict=False)
 
     train_dataloader, val_dataloader = get_dataloaders(
                                         config["dataset_dir"], 
                                         config["train_folder"], 
                                         config["val_folder"],
                                         config["batch_size"],
+                                        args.is_distributed,
     )
+    
+    if config['max_iter'] % world_size != 0:
+        logger.warning(f'The number of total iterations are not divisible by world size, training iters will be smaller than the expected number')
+    
+    if config['num_mini_batch'] // world_size == 0 or config['num_mini_batch'] % world_size != 0:
+        logger.info(f'Mini batch size needs to be divisible by total number of gpus')
+        return
+
+    max_iter = config['max_iter'] // world_size
+    num_mini_batch = config['num_mini_batch'] // world_size
 
     #TODO: change peake warmup iter
-    peak_warmup_iter = config['max_iter']//20
+    peak_warmup_iter = max_iter//20
     
-    ## TODO: how does wandb logging change here
-    run = wandb.init(
-        entity="models_deepanshi",
-        project="mae_implementation",
-        id=args.wandb_id,
-        resume="allow",
-        config={
-            "learning_rate": config["max_lr"],
-            "architecture": "MAE",
-            "epochs": config["max_iter"],
-            "batch_size": config["batch_size"],
-            "warmup_steps": peak_warmup_iter//config['num_mini_batch'],
-        },
-    )
+    if not args.is_distributed or (args.is_distributed and dist.get_rank() == 0):
+        run = wandb.init(
+            entity="models_deepanshi",
+            project="mae_implementation",
+            id=args.wandb_id,
+            resume="allow",
+            config={
+                "learning_rate": config["max_lr"],
+                "architecture": "MAE",
+                "epochs": config["max_iter"],
+                "batch_size": config["batch_size"],
+                "warmup_steps": peak_warmup_iter//num_mini_batch,
+            },
+        )
 
     #separte out weight decay params
-    weight_decay_params, non_weight_decay_params = separate_weight_decay_weights(ddp_model)
+    weight_decay_params, non_weight_decay_params = separate_weight_decay_weights(training_model)
     
     optimizer = optim.AdamW([
         {
@@ -159,91 +192,129 @@ def main(args):
     #lr scheduler
     lr_scheduler = lrScheduler(
                         optimizer, 
-                        int(peak_warmup_iter//config['num_mini_batch']), 
+                        int(peak_warmup_iter//num_mini_batch), 
                         float(config['min_lr']), 
-                        int(config['max_iter']// config['num_mini_batch'])
+                        int(max_iter// num_mini_batch)
     )
 
     if args.load_from_ckpt:
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-        start_epoch = checkpoint['epoch'] + 1
+        start_iter = checkpoint['iter'] + 1
         lr_scheduler.load_state_dict(checkpoint['lr_scheduler_state_dict'])
         best_val_loss = checkpoint['best_val_loss']
         scaler.load_state_dict(checkpoint['scaler_state_dict'])
+        curr_epoch = checkpoint['epoch']
 
     else:
-        start_epoch = 0
+        start_iter = 0
         best_val_loss = torch.inf
+        curr_epoch = 0
 
+    if args.is_distributed:
+        train_dataloader.sampler.set_epoch(curr_epoch)
     train_dataloader_iter = iter(train_dataloader)
 
     mini_batch_running_loss = 0.0
-    ddp_model.train()
+    training_model.train()
     
-    for i in range(start_epoch, config['max_iter']):
-        
+    for i in range(start_iter, max_iter):
         ##train one iter
         try:
             batch = next(train_dataloader_iter)
         except StopIteration:
             #logger.info(f'train dataloader exhaused, resetting')
+            curr_epoch += 1
+            if args.is_distributed:
+                train_dataloader.sampler.set_epoch(curr_epoch)
             train_dataloader_iter = iter(train_dataloader)
             batch = next(train_dataloader_iter)
 
         batch_loss = train_one_iter(
-            ddp_model,
+            training_model,
             batch,
             device,
-            config['num_mini_batch'],
+            num_mini_batch,
             scaler,
         )
-        mini_batch_running_loss += batch_loss.detach().item()
-        if (i+1)%config['num_mini_batch'] == 0:
-            ##grad clipping ?
+        mini_batch_running_loss += batch_loss.detach()
+        if (i+1)%num_mini_batch == 0:
             scaler.step(optimizer)     
             scaler.update()
             lr_scheduler.step()
             optimizer.zero_grad(set_to_none=True)
             current_lrs = lr_scheduler.get_lr() if lr_scheduler else [min_lr, min_lr]
-            run.log(
-                {
-                    "train_loss": mini_batch_running_loss,
-                    "lr_weighted_decay": current_lrs[0],
-                }
-            )
+
+            if args.is_distributed:
+                global_loss = mini_batch_running_loss.clone()
+                dist.all_reduce(global_loss, op=dist.ReduceOp.AVG)
+                if dist.get_rank() == 0:
+                    run.log(
+                        {
+                            "train_loss": global_loss.item(),
+                            "lr_weighted_decay": current_lrs[0],
+                        }
+                    )
+            else:
+                run.log(
+                    {
+                        "train_loss": mini_batch_running_loss.item(),
+                        "lr_weighted_decay": current_lrs[0],
+                    }
+                )
             mini_batch_running_loss = 0.0
 
             
         ##add val step code
         if (i)%config['val_loss_compute_step'] == 0:
             val_loss = get_val_loss(
-                    ddp_model,
+                    training_model,
                     val_dataloader, 
                     device,
                     config['loss_iters'],
+                    args.is_distributed,
             )
-            logger.info(val_loss)
-            run.log(
-                {
-                    "val_loss": val_loss,
-                }
-            )
+            val_loss = torch.tensor(val_loss).to(device)
+            if args.is_distributed:
+                global_val_loss = val_loss.clone()
+                dist.all_reduce(global_val_loss, op=dist.ReduceOp.AVG)
+                if dist.get_rank() == 0:
+                    logger.info(global_val_loss)
+                    run.log(
+                        {
+                            "val_loss": global_val_loss.item(),
+                        }
+                    )
+                val_loss = global_val_loss
+            else:
+                logger.info(val_loss)
+                run.log(
+                    {
+                        "val_loss": val_loss.item(),
+                    }
+                )
+                            
+
             if val_loss < best_val_loss:
-                if local_rank == 0:
+                if not args.is_distributed or (args.is_distributed and dist.get_rank() == 0):
                     checkpoint_dict = {
-                        'model_state_dict': ddp_model.state_dict(),
-                        'epoch': i,
+                        'model_state_dict': training_model.state_dict(),
+                        'epoch': curr_epoch,
+                        'iter': i,
                         'optimizer_state_dict': optimizer.state_dict(),
                         'lr_scheduler_state_dict': lr_scheduler.state_dict(),
-                        'best_val_loss': val_loss,
+                        'best_val_loss': val_loss.item(),
                         'scaler_state_dict': scaler.state_dict(),
+                        'world_size': world_size,
                     }
+                    
                     torch.save(checkpoint_dict, os.path.join(_workspace, args.model_save_path))
-                    best_val_loss = val_loss
+                best_val_loss = val_loss
+
+    if args.is_distributed:
+        dist.destroy_process_group()
 
         
 
 if __name__ == "__main__":
     arguments = parse_args()
     main(arguments)
-    dist.destroy_process_group()
