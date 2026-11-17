@@ -111,9 +111,11 @@ def main(args):
         local_rank = int(os.environ["LOCAL_RANK"])
         torch.cuda.set_device(local_rank)
         world_size = int(os.environ["WORLD_SIZE"])
+        logger.info(f"rank {dist.get_rank()}: intialization done")
     else:
         world_size = 1
         local_rank = 0
+
 
     mae_model = MAE(encoder_num_blocks=config['encoder_num_blocks'],
         decoder_num_blocks=config['decoder_num_blocks'],
@@ -128,6 +130,7 @@ def main(args):
     )
     if args.is_distributed:
         training_model = DDP(mae_model.to(local_rank), device_ids=[local_rank])
+        logger.info(f"rank {dist.get_rank()}: model init done")
     else:
         training_model = mae_model.to(device)
 
@@ -144,6 +147,9 @@ def main(args):
                                         args.is_distributed,
     )
     
+    if args.is_distributed:
+        logger.info(f"rank {dist.get_rank()}: dataloaders done")
+
     if config['max_iter'] % world_size != 0:
         logger.warning(f'The number of total iterations are not divisible by world size, training iters will be smaller than the expected number')
     
