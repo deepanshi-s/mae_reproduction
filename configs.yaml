@@ -8,7 +8,7 @@ num_emb_decoder: 512
 patch_size: 16
 input_size: [3, 224, 224]
 
-dataset_dir: /simagenet_100
+dataset_dir: /workspace/data/imagenet100/data
 train_folder: train
 val_folder: val
 

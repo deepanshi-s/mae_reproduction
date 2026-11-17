@@ -12,6 +12,9 @@ from utils import (
     separate_weight_decay_weights,
     lrScheduler,
 )
+import torch.distributed as dist
+from torch.nn.parallel import DistributedDataParallel as DDP
+
 
 def parse_args() -> argparse.Namespace:
     """
@@ -88,6 +91,9 @@ def main(args):
     logger.info(config)
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
+    dist.init_process_group("nccl")       
+    local_rank = int(os.environ["LOCAL_RANK"])
+    torch.cuda.set_device(local_rank)
 
     mae_model = MAE(encoder_num_blocks=config['encoder_num_blocks'],
         decoder_num_blocks=config['decoder_num_blocks'],
@@ -100,7 +106,8 @@ def main(args):
         input_size=config['input_size'],
         device=device,
     )
-    mae_model.to(device)
+    
+    ddp_model = DDP(mae_model.to(local_rank), device_ids=[local_rank])
 
     if args.load_from_ckpt:
         model_load_path = os.path.join(_workspace, args.load_from_ckpt)
@@ -117,6 +124,7 @@ def main(args):
     #TODO: change peake warmup iter
     peak_warmup_iter = config['max_iter']//20
     
+    ## TODO: how does wandb logging change here
     run = wandb.init(
         entity="models_deepanshi",
         project="mae_implementation",
@@ -132,7 +140,7 @@ def main(args):
     )
 
     #separte out weight decay params
-    weight_decay_params, non_weight_decay_params = separate_weight_decay_weights(mae_model)
+    weight_decay_params, non_weight_decay_params = separate_weight_decay_weights(ddp_model)
     
     optimizer = optim.AdamW([
         {
@@ -170,7 +178,7 @@ def main(args):
     train_dataloader_iter = iter(train_dataloader)
 
     mini_batch_running_loss = 0.0
-    mae_model.train()
+    ddp_model.train()
     
     for i in range(start_epoch, config['max_iter']):
         
@@ -183,7 +191,7 @@ def main(args):
             batch = next(train_dataloader_iter)
 
         batch_loss = train_one_iter(
-            mae_model,
+            ddp_model,
             batch,
             device,
             config['num_mini_batch'],
@@ -209,7 +217,7 @@ def main(args):
         ##add val step code
         if (i)%config['val_loss_compute_step'] == 0:
             val_loss = get_val_loss(
-                    mae_model,
+                    ddp_model,
                     val_dataloader, 
                     device,
                     config['loss_iters'],
@@ -221,19 +229,21 @@ def main(args):
                 }
             )
             if val_loss < best_val_loss:
-                checkpoint_dict = {
-                    'model_state_dict': mae_model.state_dict(),
-                    'epoch': i,
-                    'optimizer_state_dict': optimizer.state_dict(),
-                    'lr_scheduler_state_dict': lr_scheduler.state_dict(),
-                    'best_val_loss': val_loss,
-                    'scaler_state_dict': scaler.state_dict(),
-                }
-                torch.save(checkpoint_dict, os.path.join(_workspace, args.model_save_path))
-                best_val_loss = val_loss
+                if local_rank == 0:
+                    checkpoint_dict = {
+                        'model_state_dict': ddp_model.state_dict(),
+                        'epoch': i,
+                        'optimizer_state_dict': optimizer.state_dict(),
+                        'lr_scheduler_state_dict': lr_scheduler.state_dict(),
+                        'best_val_loss': val_loss,
+                        'scaler_state_dict': scaler.state_dict(),
+                    }
+                    torch.save(checkpoint_dict, os.path.join(_workspace, args.model_save_path))
+                    best_val_loss = val_loss
 
         
 
 if __name__ == "__main__":
     arguments = parse_args()
     main(arguments)
+    dist.destroy_process_group()
