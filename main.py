@@ -52,12 +52,20 @@ def parse_args() -> argparse.Namespace:
 
     return parser.parse_args()
 
-def train_one_iter(mae_model, batch, device, num_mini_batch, scaler):
+def train_one_iter(mae_model, batch, device, num_mini_batch, scaler, is_distributed, is_accumulating):
     xb = batch[0].to(device, non_blocking=True)
-    with torch.amp.autocast("cuda", dtype=torch.float16, enabled=(device == "cuda")):
-        batch_loss, _ = mae_model.forward(xb)
-    mini_batch_loss = batch_loss / num_mini_batch
-    scaler.scale(mini_batch_loss).backward()
+    
+    if is_distributed and is_accumulating:
+        with mae_model.no_sync():
+            with torch.amp.autocast("cuda", dtype=torch.float16, enabled=(device == "cuda")):
+                batch_loss, _ = mae_model.forward(xb)
+            mini_batch_loss = batch_loss / num_mini_batch
+            scaler.scale(mini_batch_loss).backward()
+    else:
+        with torch.amp.autocast("cuda", dtype=torch.float16, enabled=(device == "cuda")):
+            batch_loss, _ = mae_model.forward(xb)
+        mini_batch_loss = batch_loss / num_mini_batch
+        scaler.scale(mini_batch_loss).backward()
     return mini_batch_loss
 
 @torch.no_grad()
@@ -243,6 +251,8 @@ def main(args):
             device,
             num_mini_batch,
             scaler,
+            args.is_distributed,
+            False if (i+1)%num_mini_batch == 0 else True,
         )
         mini_batch_running_loss += batch_loss.detach()
         opt_step =(i + 1) // num_mini_batch

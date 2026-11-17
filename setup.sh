@@ -37,5 +37,5 @@ echo "train shards: $(ls $DATA/data/train | wc -l)  val shards: $(ls $DATA/data/
 # ---- 6. sanity + smoke test ----
 cd $CODE                                             
 python -c "import torch; assert torch.cuda.is_available(); print(torch.__version__, torch.cuda.get_device_name())"
-python main.py --wand_id test_session1                         
+#python main.py --wand_id test_session1                         
 echo "✅ setup done"
