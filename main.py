@@ -245,7 +245,7 @@ def main(args):
             scaler,
         )
         mini_batch_running_loss += batch_loss.detach()
-        opt_step =(i + 1) //mini_batch
+        opt_step =(i + 1) // num_mini_batch
         if (i+1)%num_mini_batch == 0:
             scaler.step(optimizer)     
             scaler.update()
