@@ -6,6 +6,7 @@ from loguru import logger
 from torch import optim
 import wandb
 import time
+import numpy as np
 
 from mae import MAE
 from dataloader import get_dataloaders
@@ -313,7 +314,7 @@ def main(args):
                     {
                         "train_loss": mini_batch_running_loss.item(),
                         "lr_weighted_decay": current_lrs[0],
-                        "train_itr_time": mini_batch_train_itr_time, 
+                        "train_time_per_mini_batch": mini_batch_train_itr_time, 
                         "opt_step": opt_step,
                         "images_per_sec": batch_size/mini_batch_train_itr_time,
                     }
@@ -370,14 +371,14 @@ def main(args):
                     torch.save(checkpoint_dict, os.path.join(_workspace, args.model_save_path))
                 best_val_loss = val_loss
 
-    logger.info(images_per_sec_metric)
-    mean_img_per_sec = np.mean(np.array(images_per_sec_metric))
-    std_img_per_sec = np.std(np.array(images_per_sec_metric))
+    logger.info(all_step_img_per_sec)
+    mean_img_per_sec = np.mean(np.array(all_step_img_per_sec))
+    std_img_per_sec = np.std(np.array(all_step_img_per_sec))
 
     logger.info(["mean image per second", mean_img_per_sec])
     logger.info(["std image per second", std_img_per_sec])
 
-    
+
     if args.is_distributed:
         dist.destroy_process_group()
 
