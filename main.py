@@ -235,6 +235,7 @@ def main(args):
     training_model.train()
     
     total_train_itr_time = 0
+    mini_batch_train_itr_time = 0
     for i in range(start_iter, max_iter):
         ##train one iter
         try:
@@ -266,6 +267,7 @@ def main(args):
         )
         temp_end_time = time.time(current_device_rank)
         total_train_itr_time += temp_end_time - temp_start_time
+        mini_batch_train_itr_time += (temp_end_time - temp_start_time)//num_mini_batch
         ## finish iteration time
 
         mini_batch_running_loss += batch_loss.detach()
@@ -285,6 +287,7 @@ def main(args):
                         {
                             "train_loss": global_loss.item(),
                             "lr_weighted_decay": current_lrs[0],
+                            "train_itr_time": mini_batch_train_itr_time, 
                             "opt_step": opt_step,
                         }
                     )
@@ -293,6 +296,7 @@ def main(args):
                     {
                         "train_loss": mini_batch_running_loss.item(),
                         "lr_weighted_decay": current_lrs[0],
+                        "train_itr_time": mini_batch_train_itr_time, 
                         "opt_step": opt_step,
                     }
                 )
