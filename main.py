@@ -236,7 +236,7 @@ def main(args):
     mini_batch_running_loss = 0.0
     training_model.train()
     
-    total_train_itr_time = 0
+    all_step_img_per_sec = []
     mini_batch_train_itr_time = 0
     for i in range(start_iter, max_iter):
         ##train one iter
@@ -269,7 +269,6 @@ def main(args):
         )
         torch.cuda.synchronize(current_device_rank)
         temp_end_time = time.time()
-        total_train_itr_time += temp_end_time - temp_start_time
         mini_batch_train_itr_time += (temp_end_time - temp_start_time)
         ## finish iteration time
 
@@ -295,6 +294,10 @@ def main(args):
                 dist.all_reduce(global_loss, op=dist.ReduceOp.AVG)
                 global_mini_batch_train_itr_time = torch.tensor(mini_batch_train_itr_time).to(dist.get_rank())
                 dist.reduce(global_mini_batch_train_itr_time, dst=0, op=dist.ReduceOp.AVG)
+
+                images_per_sec_metric = (world_size*batch_size)/global_mini_batch_train_itr_time.detach().item()
+                all_step_img_per_sec.append(images_per_sec_metric)
+
                 if dist.get_rank() == 0:
                     run.log(
                         {
@@ -302,7 +305,7 @@ def main(args):
                             "lr_weighted_decay": current_lrs[0],
                             "train_time_per_mini_batch": global_mini_batch_train_itr_time.detach().item(), 
                             "opt_step": opt_step,
-                            "images_per_sec": (world_size*batch_size)/global_mini_batch_train_itr_time.detach().item(),
+                            "images_per_sec": images_per_sec_metric,
                         }
                     )
             else:
@@ -367,7 +370,14 @@ def main(args):
                     torch.save(checkpoint_dict, os.path.join(_workspace, args.model_save_path))
                 best_val_loss = val_loss
 
-    logger.info(total_train_itr_time/(max_iter - start_iter))
+    logger.info(images_per_sec_metric)
+    mean_img_per_sec = np.mean(np.array(images_per_sec_metric))
+    std_img_per_sec = np.std(np.array(images_per_sec_metric))
+
+    logger.info(["mean image per second", mean_img_per_sec])
+    logger.info(["std image per second", std_img_per_sec])
+
+    
     if args.is_distributed:
         dist.destroy_process_group()
 
