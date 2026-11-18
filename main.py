@@ -265,7 +265,8 @@ def main(args):
             args.is_distributed,
             False if (i+1)%num_mini_batch == 0 else True,
         )
-        temp_end_time = time.time(current_device_rank)
+        torch.cuda.synchronize(current_device_rank)
+        temp_end_time = time.time()
         total_train_itr_time += temp_end_time - temp_start_time
         mini_batch_train_itr_time += (temp_end_time - temp_start_time)//num_mini_batch
         ## finish iteration time
