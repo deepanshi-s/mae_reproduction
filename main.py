@@ -294,7 +294,7 @@ def main(args):
                             "lr_weighted_decay": current_lrs[0],
                             "train_itr_time": global_mini_batch_train_itr_time.detach().item(), 
                             "opt_step": opt_step,
-                            "images_per_sec": batch_size/global_mini_batch_train_itr_time.detach().item(),
+                            "images_per_sec": (world_size*batch_size)/global_mini_batch_train_itr_time.detach().item(),
                         }
                     )
             else:
