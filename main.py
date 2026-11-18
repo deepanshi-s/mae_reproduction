@@ -285,7 +285,7 @@ def main(args):
             if args.is_distributed:
                 global_loss = mini_batch_running_loss.clone()
                 dist.all_reduce(global_loss, op=dist.ReduceOp.AVG)
-                global_mini_batch_train_itr_time = mini_batch_train_itr_time.clone()
+                global_mini_batch_train_itr_time = mini_batch_train_itr_time
                 dist.reduce(global_mini_batch_train_itr_time, dst=0, op=dist.ReduceOp.AVG)
                 if dist.get_rank() == 0:
                     run.log(
