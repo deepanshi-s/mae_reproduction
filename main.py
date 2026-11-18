@@ -241,6 +241,8 @@ def main(args):
     mini_batch_train_itr_time = 0
     for i in range(start_iter, max_iter):
         ##train one iter
+        torch.cuda.synchronize(current_device_rank)
+        temp_start_time = time.time()
         try:
             batch = next(train_dataloader_iter)
         except StopIteration:
@@ -256,9 +258,7 @@ def main(args):
             current_device_rank = dist.get_rank()
         else:
             current_device_rank = local_rank
-
-        torch.cuda.synchronize(current_device_rank)
-        temp_start_time = time.time()
+        
         batch_loss = train_one_iter(
             training_model,
             batch,
@@ -356,7 +356,7 @@ def main(args):
                             
 
             if val_loss < best_val_loss:
-                if not args.is_distributed or (args.is_distributed and dist.get_rank() == 0):
+                """if not args.is_distributed or (args.is_distributed and dist.get_rank() == 0):
                     checkpoint_dict = {
                         'model_state_dict': training_model.state_dict(),
                         'epoch': curr_epoch,
@@ -369,6 +369,7 @@ def main(args):
                     }
                     
                     torch.save(checkpoint_dict, os.path.join(_workspace, args.model_save_path))
+                """
                 best_val_loss = val_loss
 
     logger.info(all_step_img_per_sec)
