@@ -239,6 +239,11 @@ def main(args):
     
     all_step_img_per_sec = []
     mini_batch_train_itr_time = 0
+    if args.is_distributed:
+        current_device_rank = dist.get_rank()
+    else:
+        current_device_rank = local_rank
+        
     for i in range(start_iter, max_iter):
         ##train one iter
         torch.cuda.synchronize(current_device_rank)
@@ -254,10 +259,6 @@ def main(args):
             batch = next(train_dataloader_iter)
 
         ## start iteration time
-        if args.is_distributed:
-            current_device_rank = dist.get_rank()
-        else:
-            current_device_rank = local_rank
         
         batch_loss = train_one_iter(
             training_model,
