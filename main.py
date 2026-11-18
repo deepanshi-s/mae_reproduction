@@ -5,6 +5,7 @@ import torch
 from loguru import logger
 from torch import optim
 import wandb
+import time
 
 from mae import MAE
 from dataloader import get_dataloaders
@@ -233,6 +234,7 @@ def main(args):
     mini_batch_running_loss = 0.0
     training_model.train()
     
+    total_train_itr_time = 0
     for i in range(start_iter, max_iter):
         ##train one iter
         try:
@@ -245,6 +247,14 @@ def main(args):
             train_dataloader_iter = iter(train_dataloader)
             batch = next(train_dataloader_iter)
 
+        ## start iteration time
+        if args.is_distributed:
+            current_device_rank = dist.get_rank()
+        else:
+            current_device_rank = local_rank
+
+        torch.cuda.synchronize(current_device_rank)
+        temp_start_time = time.time()
         batch_loss = train_one_iter(
             training_model,
             batch,
@@ -254,6 +264,10 @@ def main(args):
             args.is_distributed,
             False if (i+1)%num_mini_batch == 0 else True,
         )
+        temp_end_time = time.time(current_device_rank)
+        total_train_itr_time += temp_end_time - temp_start_time
+        ## finish iteration time
+
         mini_batch_running_loss += batch_loss.detach()
         opt_step =(i + 1) // num_mini_batch
         if (i+1)%num_mini_batch == 0:
@@ -333,6 +347,7 @@ def main(args):
                     torch.save(checkpoint_dict, os.path.join(_workspace, args.model_save_path))
                 best_val_loss = val_loss
 
+    logger.info(total_train_itr_time/(max_iter - start_iter))
     if args.is_distributed:
         dist.destroy_process_group()
 
