@@ -268,7 +268,7 @@ def main(args):
         torch.cuda.synchronize(current_device_rank)
         temp_end_time = time.time()
         total_train_itr_time += temp_end_time - temp_start_time
-        mini_batch_train_itr_time += (temp_end_time - temp_start_time)//num_mini_batch
+        mini_batch_train_itr_time += (temp_end_time - temp_start_time)/num_mini_batch
         ## finish iteration time
 
         mini_batch_running_loss += batch_loss.detach()
