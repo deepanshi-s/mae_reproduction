@@ -243,7 +243,7 @@ def main(args):
         current_device_rank = dist.get_rank()
     else:
         current_device_rank = local_rank
-        
+
     for i in range(start_iter, max_iter):
         ##train one iter
         torch.cuda.synchronize(current_device_rank)
@@ -297,10 +297,9 @@ def main(args):
                 global_mini_batch_train_itr_time = torch.tensor(mini_batch_train_itr_time).to(dist.get_rank())
                 dist.reduce(global_mini_batch_train_itr_time, dst=0, op=dist.ReduceOp.AVG)
 
-                images_per_sec_metric = (world_size*batch_size)/global_mini_batch_train_itr_time.detach().item()
-                all_step_img_per_sec.append(images_per_sec_metric)
-
                 if dist.get_rank() == 0:
+                    images_per_sec_metric = (world_size*batch_size)/global_mini_batch_train_itr_time.detach().item()
+                    all_step_img_per_sec.append(images_per_sec_metric)
                     run.log(
                         {
                             "train_loss": global_loss.item(),
@@ -357,6 +356,7 @@ def main(args):
                             
 
             if val_loss < best_val_loss:
+                # TODO: checkpointing should be done async with torch
                 """if not args.is_distributed or (args.is_distributed and dist.get_rank() == 0):
                     checkpoint_dict = {
                         'model_state_dict': training_model.state_dict(),
@@ -373,12 +373,12 @@ def main(args):
                 """
                 best_val_loss = val_loss
 
-    logger.info(all_step_img_per_sec)
-    mean_img_per_sec = np.mean(np.array(all_step_img_per_sec))
-    std_img_per_sec = np.std(np.array(all_step_img_per_sec))
+    if dist.get_rank() == 0:
+        mean_img_per_sec = np.mean(np.array(all_step_img_per_sec))
+        std_img_per_sec = np.std(np.array(all_step_img_per_sec))
 
-    logger.info(["mean image per second", mean_img_per_sec])
-    logger.info(["std image per second", std_img_per_sec])
+        logger.info(["mean image per second", mean_img_per_sec])
+        logger.info(["std image per second", std_img_per_sec])
 
 
     if args.is_distributed:
