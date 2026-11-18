@@ -285,14 +285,16 @@ def main(args):
             if args.is_distributed:
                 global_loss = mini_batch_running_loss.clone()
                 dist.all_reduce(global_loss, op=dist.ReduceOp.AVG)
+                global_mini_batch_train_itr_time = mini_batch_train_itr_time.clone()
+                dist.reduce(global_mini_batch_train_itr_time, dst=0, op=dist.ReduceOp.AVG)
                 if dist.get_rank() == 0:
                     run.log(
                         {
                             "train_loss": global_loss.item(),
                             "lr_weighted_decay": current_lrs[0],
-                            "train_itr_time": mini_batch_train_itr_time, 
+                            "train_itr_time": global_mini_batch_train_itr_time, 
                             "opt_step": opt_step,
-                            "images_per_sec": batch_size/mini_batch_train_itr_time,
+                            "images_per_sec": batch_size/global_mini_batch_train_itr_time,
                         }
                     )
             else:
