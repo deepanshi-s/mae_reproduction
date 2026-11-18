@@ -302,6 +302,7 @@ def main(args):
                     }
                 )
             mini_batch_running_loss = 0.0
+            mini_batch_train_itr_time = 0.0
 
             
         ##add val step code
