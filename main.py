@@ -231,6 +231,8 @@ def main(args):
         train_dataloader.sampler.set_epoch(curr_epoch)
     train_dataloader_iter = iter(train_dataloader)
 
+    batch_size = config["batch_size"]
+
     mini_batch_running_loss = 0.0
     training_model.train()
     
@@ -290,6 +292,7 @@ def main(args):
                             "lr_weighted_decay": current_lrs[0],
                             "train_itr_time": mini_batch_train_itr_time, 
                             "opt_step": opt_step,
+                            "images_per_sec": batch_size/mini_batch_train_itr_time,
                         }
                     )
             else:
@@ -299,6 +302,7 @@ def main(args):
                         "lr_weighted_decay": current_lrs[0],
                         "train_itr_time": mini_batch_train_itr_time, 
                         "opt_step": opt_step,
+                        "images_per_sec": batch_size/mini_batch_train_itr_time,
                     }
                 )
             mini_batch_running_loss = 0.0
