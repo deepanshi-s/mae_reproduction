@@ -270,16 +270,24 @@ def main(args):
         torch.cuda.synchronize(current_device_rank)
         temp_end_time = time.time()
         total_train_itr_time += temp_end_time - temp_start_time
-        mini_batch_train_itr_time += (temp_end_time - temp_start_time)/num_mini_batch
+        mini_batch_train_itr_time += (temp_end_time - temp_start_time)
         ## finish iteration time
 
         mini_batch_running_loss += batch_loss.detach()
         opt_step =(i + 1) // num_mini_batch
         if (i+1)%num_mini_batch == 0:
+            torch.cuda.synchronize(current_device_rank)
+            temp_start_time = time.time()
             scaler.step(optimizer)     
             scaler.update()
             lr_scheduler.step()
             optimizer.zero_grad(set_to_none=True)
+            
+            torch.cuda.synchronize(current_device_rank)
+            temp_end_time = time.time()
+            mini_batch_train_itr_time += (temp_end_time - temp_start_time)
+            mini_batch_train_itr_time /= num_mini_batch
+
             current_lrs = lr_scheduler.get_lr() if lr_scheduler else [min_lr, min_lr]
 
             if args.is_distributed:
@@ -292,7 +300,7 @@ def main(args):
                         {
                             "train_loss": global_loss.item(),
                             "lr_weighted_decay": current_lrs[0],
-                            "train_itr_time": global_mini_batch_train_itr_time.detach().item(), 
+                            "train_time_per_mini_batch": global_mini_batch_train_itr_time.detach().item(), 
                             "opt_step": opt_step,
                             "images_per_sec": (world_size*batch_size)/global_mini_batch_train_itr_time.detach().item(),
                         }
