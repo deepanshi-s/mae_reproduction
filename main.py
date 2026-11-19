@@ -272,7 +272,7 @@ def main(args):
 
         ## start iteration time
         
-        """batch_loss = train_one_iter(
+        batch_loss = train_one_iter(
             training_model,
             batch,
             device,
@@ -281,23 +281,18 @@ def main(args):
             gpu_transforms,
             args.is_distributed,
             False if (i+1)%num_mini_batch == 0 else True,
-        )"""
+        )
         batch_loss = torch.tensor(0).to(device)
 
-        torch.cuda.synchronize(current_device_rank)
-        temp_end_time = time.time()
-        mini_batch_train_itr_time += (temp_end_time - temp_start_time)
         ## finish iteration time
 
         mini_batch_running_loss += batch_loss.detach()
         opt_step =(i + 1) // num_mini_batch
         if (i+1)%num_mini_batch == 0:
-            torch.cuda.synchronize(current_device_rank)
-            temp_start_time = time.time()
-            #scaler.step(optimizer)     
-            #scaler.update()
-            #lr_scheduler.step()
-            #optimizer.zero_grad(set_to_none=True)
+            scaler.step(optimizer)     
+            scaler.update()
+            lr_scheduler.step()
+            optimizer.zero_grad(set_to_none=True)
             
             torch.cuda.synchronize(current_device_rank)
             temp_end_time = time.time()
