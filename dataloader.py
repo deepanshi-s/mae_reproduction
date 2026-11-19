@@ -66,6 +66,9 @@ class Imagenet100(Dataset):
             img = np.array(Image.open(io.BytesIO(raw_bytes)).convert("RGB"))
             img = torch.from_numpy(img).permute(2, 0, 1)
 
+        if img.shape[0] != 3:
+            img = img.repeat(3, 1, 1)
+
         img_tensor = self.img_transforms(img)
 
         return img_tensor, label
