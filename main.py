@@ -282,8 +282,6 @@ def main(args):
             args.is_distributed,
             False if (i+1)%num_mini_batch == 0 else True,
         )
-        batch_loss = torch.tensor(0).to(device)
-
         ## finish iteration time
 
         mini_batch_running_loss += batch_loss.detach()
