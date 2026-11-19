@@ -65,10 +65,7 @@ class Imagenet100(Dataset):
         else:
             img = np.array(Image.open(io.BytesIO(raw_bytes)).convert("RGB"))
             img = torch.from_numpy(img)
-        
-        if img == None or img.shape == None:
-            continue
-        
+
         img_tensor = self.img_transforms(img)
 
         return img_tensor, label
