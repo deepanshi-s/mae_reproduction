@@ -74,14 +74,10 @@ def init_transforms():
     train_transforms = v2.Compose([
         v2.RandomResizedCrop((224, 224), (0.2, 1.0)),
         v2.RandomHorizontalFlip(),
-        v2.ToDtype(torch.float, scale=True),
-        v2.Normalize(imagenet_mean, imagenet_std),
         
     ])
     val_transforms =  v2.Compose([
         v2.Resize((224, 224)),
-        v2.ToDtype(torch.float, scale=True),
-        v2.Normalize(imagenet_mean, imagenet_std),
         
     ])
     return train_transforms, val_transforms

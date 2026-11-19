@@ -9,7 +9,11 @@ import time
 import numpy as np
 
 from mae import MAE
-from dataloader import get_dataloaders
+from dataloader import (
+    get_dataloaders,
+    imagenet_mean,
+    imagenet_std,
+)
 from utils import (
     separate_weight_decay_weights,
     lrScheduler,
@@ -54,9 +58,9 @@ def parse_args() -> argparse.Namespace:
 
     return parser.parse_args()
 
-def train_one_iter(mae_model, batch, device, num_mini_batch, scaler, is_distributed, is_accumulating):
+def train_one_iter(mae_model, batch, device, num_mini_batch, scaler, gpu_transforms, is_distributed, is_accumulating):
     xb = batch[0].to(device, non_blocking=True)
-    
+    xb = gpu_transforms(xb)
     if is_distributed and is_accumulating:
         with mae_model.no_sync():
             with torch.amp.autocast("cuda", dtype=torch.float16, enabled=(device == "cuda")):
@@ -76,6 +80,7 @@ def get_val_loss(
         val_dataloader,
         device, 
         loss_iters,
+        gpu_transforms,
         is_distributed,
     ):
     val_loss = 0.0
@@ -98,6 +103,7 @@ def get_val_loss(
             batch = next(val_dataloader_iter)
 
         xb = batch[0].to(device, non_blocking=True)
+        xb = gpu_transforms(xb)
         with torch.amp.autocast("cuda", dtype=torch.float16, enabled=(device == "cuda")):
             batch_loss, _ = mae_model.forward(xb)
         val_loss += batch_loss.detach().item()/loss_iters
@@ -237,6 +243,11 @@ def main(args):
     mini_batch_running_loss = 0.0
     training_model.train()
     
+    gpu_transforms = v2.Compose([
+        v2.ToDtype(torch.float, scale=True),
+        v2.Normalize(imagenet_mean, imagenet_std),
+    ])
+
     all_step_img_per_sec = []
     mini_batch_train_itr_time = 0
     if args.is_distributed:
@@ -266,6 +277,7 @@ def main(args):
             device,
             num_mini_batch,
             scaler,
+            gpu_transforms,
             args.is_distributed,
             False if (i+1)%num_mini_batch == 0 else True,
         )
@@ -330,6 +342,7 @@ def main(args):
                     val_dataloader, 
                     device,
                     config['loss_iters'],
+                    gpu_transforms,
                     args.is_distributed,
             )
             val_loss = torch.tensor(val_loss).to(device)
