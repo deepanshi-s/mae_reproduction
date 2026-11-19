@@ -100,7 +100,7 @@ def get_dataloaders(dataset_dir, train_folder, val_folder, batch_size, is_distri
         val_distrbuted = None
         shuffle = True
 
-    train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=shuffle, num_workers=4, sampler=train_distributed)
-    val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=shuffle, num_workers=4, sampler=val_distrbuted)
+    train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=shuffle, prefetch_factor=2, num_workers=4, sampler=train_distributed, pin_memory=True)
+    val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=shuffle, prefetch_factor=2, num_workers=4, sampler=val_distrbuted, pin_memory=True)
 
     return train_dataloader, val_dataloader
