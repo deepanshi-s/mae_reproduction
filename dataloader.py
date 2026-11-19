@@ -45,13 +45,12 @@ class Imagenet100(Dataset):
         label = self.labels[idx]
         
         raw_bytes = image_data['bytes'] if isinstance(image_data, dict) else image_data
-        
+
         if isinstance(raw_bytes, np.ndarray):
             img = np.array(Image.fromarray(raw_bytes.astype('uint8')).convert("RGB"))
         else:
             img = np.array(Image.open(io.BytesIO(raw_bytes)).convert("RGB"))
         
-        img = img/255.
         img_tensor = self.img_transforms(img)
 
         img_tensor = img_tensor.to(torch.float)
@@ -85,7 +84,7 @@ def get_dataloaders(dataset_dir, train_folder, val_folder, batch_size, is_distri
         val_distrbuted = None
         shuffle = True
 
-    train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=shuffle, num_workers=8, sampler=train_distributed)
-    val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=shuffle, num_workers=8, sampler=val_distrbuted)
+    train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=shuffle, num_workers=4, prefetch_factor=2, sampler=train_distributed, pin_memory=True)
+    val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=shuffle, num_workers=4, prefetch_factor=2, sampler=val_distrbuted, pin_memory=True)
 
     return train_dataloader, val_dataloader

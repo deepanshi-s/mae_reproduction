@@ -97,7 +97,7 @@ def get_val_loss(
             val_dataloader_iter = iter(val_dataloader)
             batch = next(val_dataloader_iter)
 
-        xb = batch[0].to(device)
+        xb = batch[0].to(device, non_blocking=True)
         with torch.amp.autocast("cuda", dtype=torch.float16, enabled=(device == "cuda")):
             batch_loss, _ = mae_model.forward(xb)
         val_loss += batch_loss.detach().item()/loss_iters
