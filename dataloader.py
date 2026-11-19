@@ -57,7 +57,7 @@ class Imagenet100(Dataset):
         raw_bytes = image_data['bytes'] if isinstance(image_data, dict) else image_data
 
         if isinstance(raw_bytes, np.ndarray):
-            img = np.array(Image.fromarray(raw_bytes.astype('uint8')).convert("RGB"))
+            img = torch.from_numpy(img).permute(2, 0, 1)
         elif detect_image_format(raw_bytes) == 'PNG':
             img = decode_png(raw_bytes, mode='UNCHANGED', output_dtype=torch.uint8)
         elif detect_image_format(raw_bytes) == 'JPEG':
