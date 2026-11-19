@@ -7,6 +7,7 @@ from torch import optim
 import wandb
 import time
 import numpy as np
+from torchvision.transforms import v2
 
 from mae import MAE
 from dataloader import (
