@@ -1,6 +1,7 @@
 import torch
 import os
 import io
+
 from torch.utils.data import Dataset, DataLoader
 from torchvision import datasets
 from torchvision.transforms import v2
@@ -12,9 +13,18 @@ import time
 import torchvision.transforms.functional as F
 from torchvision.transforms import *
 from torch.utils.data.distributed import DistributedSampler
+from torchcodec.decoders import decode_png, decode_jpeg
+
 
 imagenet_mean = np.array([0.485, 0.456, 0.406])
 imagenet_std =  np.array([0.229, 0.224, 0.225])
+
+def detect_image_format(data: bytes) -> str:
+    if data.startswith(b'\x89PNG\r\n\x1a\n'):
+        return 'PNG'
+    elif data.startswith(b'\xff\xd8\xff'):
+        return 'JPEG'
+    return 'UNKNOWN'
 
 class Imagenet100(Dataset):
     def __init__(self, dataset_dir: str, folder: str, img_transforms=None):
@@ -48,25 +58,28 @@ class Imagenet100(Dataset):
 
         if isinstance(raw_bytes, np.ndarray):
             img = np.array(Image.fromarray(raw_bytes.astype('uint8')).convert("RGB"))
+        elif detect_image_format(raw_bytes) == 'PNG':
+            img = decode_png(raw_bytes, mode='UNCHANGED', output_dtype=torch.uint8)
         else:
-            img = np.array(Image.open(io.BytesIO(raw_bytes)).convert("RGB"))
-        
+            img = decode_jpeg(raw_bytes, mode='UNCHANGED', output_dtype=torch.uint8)
+            
         img_tensor = self.img_transforms(img)
 
-        img_tensor = img_tensor.to(torch.float)
         return img_tensor, label
 
 def init_transforms():
-    train_transforms = Compose([
-        ToTensor(),
-        RandomResizedCrop((224, 224), (0.2, 1.0)),
-        RandomHorizontalFlip(),
-        Normalize(imagenet_mean, imagenet_std),
+    train_transforms = v2.Compose([
+        v2.RandomResizedCrop((224, 224), (0.2, 1.0)),
+        v2.RandomHorizontalFlip(),
+        v2.ToDtype(torch.float, scale=True),
+        v2.Normalize(imagenet_mean, imagenet_std),
+        
     ])
-    val_transforms =  Compose([
-        ToTensor(),
-        Resize((224, 224)),
-        Normalize(imagenet_mean, imagenet_std),
+    val_transforms =  v2.Compose([
+        v2.Resize((224, 224)),
+        v2.ToDtype(torch.float, scale=True),
+        v2.Normalize(imagenet_mean, imagenet_std),
+        
     ])
     return train_transforms, val_transforms
 
