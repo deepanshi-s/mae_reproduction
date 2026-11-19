@@ -60,9 +60,10 @@ class Imagenet100(Dataset):
             img = np.array(Image.fromarray(raw_bytes.astype('uint8')).convert("RGB"))
         elif detect_image_format(raw_bytes) == 'PNG':
             img = decode_png(raw_bytes, mode='UNCHANGED', output_dtype=torch.uint8)
-        else:
+        elif detect_image_format(raw_bytes) == 'JPEG':
             img = decode_jpeg(raw_bytes, mode='UNCHANGED', output_dtype=torch.uint8)
-            
+        else:
+            img = np.array(Image.open(io.BytesIO(raw_bytes)).convert("RGB"))
         img_tensor = self.img_transforms(img)
 
         return img_tensor, label
