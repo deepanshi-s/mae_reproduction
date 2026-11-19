@@ -64,7 +64,7 @@ class Imagenet100(Dataset):
             img = decode_jpeg(raw_bytes, mode='UNCHANGED', output_dtype=torch.uint8)
         else:
             img = np.array(Image.open(io.BytesIO(raw_bytes)).convert("RGB"))
-            img = torch.from_numpy(img)
+            img = torch.from_numpy(img).permute(2, 0, 1)
 
         img_tensor = self.img_transforms(img)
 
