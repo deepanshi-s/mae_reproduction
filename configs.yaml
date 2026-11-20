@@ -19,4 +19,4 @@ min_lr: 0.000001 #1e-6
 weight_decay: 0.05
 num_mini_batch: 16
 max_iter: 3200
-val_loss_compute_step: 100
+val_loss_compute_step: 3200
