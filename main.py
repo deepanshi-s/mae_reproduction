@@ -183,7 +183,7 @@ def main(args):
     if not args.is_distributed or (args.is_distributed and dist.get_rank() == 0):
         run = wandb.init(
             entity="models_deepanshi",
-            project="mae_implementation",
+            project="w8_mae_benchmarking",
             id=args.wandb_id,
             resume="allow",
             config={
@@ -256,10 +256,11 @@ def main(args):
     else:
         current_device_rank = local_rank
 
+    torch.cuda.synchronize(current_device_rank)
+    temp_start_time = time.time()
+
     for i in range(start_iter, max_iter):
-        ##train one iter
-        torch.cuda.synchronize(current_device_rank)
-        temp_start_time = time.time()
+        ##train one iter    
         try:
             batch = next(train_dataloader_iter)
         except StopIteration:
@@ -291,11 +292,6 @@ def main(args):
             scaler.update()
             lr_scheduler.step()
             optimizer.zero_grad(set_to_none=True)
-            
-            torch.cuda.synchronize(current_device_rank)
-            temp_end_time = time.time()
-            mini_batch_train_itr_time += (temp_end_time - temp_start_time)
-            mini_batch_train_itr_time /= num_mini_batch
 
             current_lrs = lr_scheduler.get_lr() if lr_scheduler else [min_lr, min_lr]
 
@@ -305,6 +301,11 @@ def main(args):
                 global_mini_batch_train_itr_time = torch.tensor(mini_batch_train_itr_time).to(dist.get_rank())
                 dist.reduce(global_mini_batch_train_itr_time, dst=0, op=dist.ReduceOp.AVG)
 
+                torch.cuda.synchronize(current_device_rank)
+                temp_end_time = time.time()
+                mini_batch_train_itr_time += (temp_end_time - temp_start_time)
+                mini_batch_train_itr_time /= num_mini_batch
+                
                 if dist.get_rank() == 0:
                     images_per_sec_metric = (world_size*batch_size)/global_mini_batch_train_itr_time.detach().item()
                     all_step_img_per_sec.append(images_per_sec_metric)
@@ -318,6 +319,11 @@ def main(args):
                         }
                     )
             else:
+                torch.cuda.synchronize(current_device_rank)
+                temp_end_time = time.time()
+                mini_batch_train_itr_time += (temp_end_time - temp_start_time)
+                mini_batch_train_itr_time /= num_mini_batch
+
                 run.log(
                     {
                         "train_loss": mini_batch_running_loss.item(),
@@ -329,6 +335,8 @@ def main(args):
                 )
             mini_batch_running_loss = 0.0
             mini_batch_train_itr_time = 0.0
+            temp_start_time = time.time()
+            temp_end_time = 0.0
 
             
         ##add val step code
