@@ -298,13 +298,14 @@ def main(args):
             if args.is_distributed:
                 global_loss = mini_batch_running_loss.clone()
                 dist.all_reduce(global_loss, op=dist.ReduceOp.AVG)
-                global_mini_batch_train_itr_time = torch.tensor(mini_batch_train_itr_time).to(dist.get_rank())
-                dist.reduce(global_mini_batch_train_itr_time, dst=0, op=dist.ReduceOp.AVG)
 
                 torch.cuda.synchronize(current_device_rank)
                 temp_end_time = time.time()
+                
                 mini_batch_train_itr_time += (temp_end_time - temp_start_time)
                 mini_batch_train_itr_time /= num_mini_batch
+                global_mini_batch_train_itr_time = torch.tensor(mini_batch_train_itr_time).to(dist.get_rank())
+                dist.reduce(global_mini_batch_train_itr_time, dst=0, op=dist.ReduceOp.AVG)
                 
                 if dist.get_rank() == 0:
                     images_per_sec_metric = (world_size*batch_size)/global_mini_batch_train_itr_time.detach().item()
