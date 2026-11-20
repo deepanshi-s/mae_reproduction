@@ -396,7 +396,7 @@ def main(args):
                 best_val_loss = val_loss
 
     if dist.get_rank() == 0:
-        mean_img_per_sec = np.mean(np.array(all_step_img_per_sec))
+        median_img_per_sec = np.median(np.array(all_step_img_per_sec))
         std_img_per_sec = np.std(np.array(all_step_img_per_sec))
 
         logger.info(["mean image per second", mean_img_per_sec])
