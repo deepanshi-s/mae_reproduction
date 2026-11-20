@@ -260,6 +260,9 @@ def main(args):
     temp_start_time = time.time()
 
     for i in range(start_iter, max_iter):
+        if (i)%num_mini_batch == 0:
+            start_time = time.time()
+
         ##train one iter    
         try:
             batch = next(train_dataloader_iter)
@@ -301,7 +304,7 @@ def main(args):
 
                 torch.cuda.synchronize(current_device_rank)
                 temp_end_time = time.time()
-                
+
                 mini_batch_train_itr_time += (temp_end_time - temp_start_time)
                 mini_batch_train_itr_time /= num_mini_batch
                 global_mini_batch_train_itr_time = torch.tensor(mini_batch_train_itr_time).to(dist.get_rank())
@@ -336,7 +339,7 @@ def main(args):
                 )
             mini_batch_running_loss = 0.0
             mini_batch_train_itr_time = 0.0
-            temp_start_time = time.time()
+            temp_start_time = 0.0
             temp_end_time = 0.0
 
             
