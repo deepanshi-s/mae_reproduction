@@ -261,7 +261,7 @@ def main(args):
     for i in range(start_iter, max_iter):
         if (i)%num_mini_batch == 0:
             torch.cuda.synchronize(current_device_rank)
-            start_time = time.time()
+            temp_start_time = time.time()
 
         ##train one iter
         try:
