@@ -257,13 +257,13 @@ def main(args):
         current_device_rank = local_rank
 
     torch.cuda.synchronize(current_device_rank)
-    temp_start_time = time.time()
 
     for i in range(start_iter, max_iter):
         if (i)%num_mini_batch == 0:
+            torch.cuda.synchronize(current_device_rank)
             start_time = time.time()
 
-        ##train one iter    
+        ##train one iter
         try:
             batch = next(train_dataloader_iter)
         except StopIteration:
@@ -325,6 +325,7 @@ def main(args):
             else:
                 torch.cuda.synchronize(current_device_rank)
                 temp_end_time = time.time()
+
                 mini_batch_train_itr_time += (temp_end_time - temp_start_time)
                 mini_batch_train_itr_time /= num_mini_batch
 
