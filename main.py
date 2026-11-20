@@ -399,7 +399,7 @@ def main(args):
         median_img_per_sec = np.median(np.array(all_step_img_per_sec))
         std_img_per_sec = np.std(np.array(all_step_img_per_sec))
 
-        logger.info(["mean image per second", mean_img_per_sec])
+        logger.info(["mean image per second", median_img_per_sec])
         logger.info(["std image per second", std_img_per_sec])
 
 
