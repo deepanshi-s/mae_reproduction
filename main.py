@@ -21,7 +21,7 @@ from utils import (
 )
 import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
-
+from torch.nn.parallel import FullyShardedDataParallel as FSDP
 
 def parse_args() -> argparse.Namespace:
     """
@@ -55,6 +55,12 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         default=False,
         help="If the training is multi gpu"
+    )
+    parser.add_argument(
+        "--fsdp",
+        action="store_true",
+        default=False,
+        help="fsdp model training if true, else ddp",
     )
 
     return parser.parse_args()
@@ -146,7 +152,10 @@ def main(args):
         device=device,
     )
     if args.is_distributed:
-        training_model = DDP(mae_model.to(local_rank), device_ids=[local_rank])
+        if args.is_fdp:
+            training_model = FSDP(mae_model)
+        else:
+            training_model = DDP(mae_model.to(local_rank), device_ids=[local_rank])
         logger.info(f"rank {dist.get_rank()}: model init done")
     else:
         training_model = mae_model.to(device)
