@@ -152,7 +152,7 @@ def main(args):
         device=device,
     )
     if args.is_distributed:
-        if args.is_fdp:
+        if args.fsdp:
             training_model = FSDP(mae_model)
         else:
             training_model = DDP(mae_model.to(local_rank), device_ids=[local_rank])
