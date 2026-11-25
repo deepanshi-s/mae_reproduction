@@ -21,7 +21,7 @@ from utils import (
 )
 import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
-from torch.nn.fsdp import FullyShardedDataParallel as FSDP
+from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 
 def parse_args() -> argparse.Namespace:
     """
