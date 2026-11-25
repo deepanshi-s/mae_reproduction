@@ -153,7 +153,7 @@ def main(args):
     )
     if args.is_distributed:
         if args.fsdp:
-            training_model = FSDP(mae_model)
+            training_model = FSDP(mae_model.to(local_rank))
         else:
             training_model = DDP(mae_model.to(local_rank), device_ids=[local_rank])
         logger.info(f"rank {dist.get_rank()}: model init done")
