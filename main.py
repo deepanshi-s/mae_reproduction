@@ -1,5 +1,6 @@
 import argparse
 import yaml
+import functools
 import os
 import torch
 from loguru import logger
@@ -22,6 +23,11 @@ from utils import (
 import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
+from torch.distributed.fsdp.wrap import (
+    size_based_auto_wrap_policy,
+    enable_wrap,
+    wrap,
+)
 
 def parse_args() -> argparse.Namespace:
     """
@@ -153,7 +159,11 @@ def main(args):
     )
     if args.is_distributed:
         if args.fsdp:
-            training_model = FSDP(mae_model.to(local_rank))
+            #wrap policy
+            my_auto_wrap_policy = functools.partial(
+                size_based_auto_wrap_policy, min_num_params=20000
+            )
+            training_model = FSDP(mae_model.to(local_rank), auto_wrap_policy=my_auto_wrap_policy)
         else:
             training_model = DDP(mae_model.to(local_rank), device_ids=[local_rank])
         logger.info(f"rank {dist.get_rank()}: model init done")
