@@ -416,6 +416,9 @@ def main(args):
                 """
                 best_val_loss = val_loss
 
+    peak_alloc = torch.cuda.max_memory_allocated() / 1e9
+    peak_reserved = torch.cuda.max_memory_reserved() / 1e9
+    logger.info(f"rank {rank}: peak allocated {peak_alloc:.2f} GB, reserved {peak_reserved:.2f} GB")
     if dist.get_rank() == 0:
         median_img_per_sec = np.median(np.array(all_step_img_per_sec))
         mean_img_per_sec = np.mean(np.array(all_step_img_per_sec))
@@ -424,7 +427,7 @@ def main(args):
         logger.info(["median image per second", median_img_per_sec])
         logger.info(["mean image per second", mean_img_per_sec])
         logger.info(["std image per second", std_img_per_sec])
-
+        logger.info(f"rank {rank}: peak allocated {peak_alloc:.2f} GB, reserved {peak_reserved:.2f} GB")
 
     if args.is_distributed:
         dist.destroy_process_group()
