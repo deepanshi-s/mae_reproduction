@@ -11,6 +11,7 @@ import numpy as np
 from torchvision.transforms import v2
 
 from mae import MAE
+from vit import Block
 from dataloader import (
     get_dataloaders,
     imagenet_mean,
@@ -24,7 +25,7 @@ import torch.distributed as dist
 from torch.nn.parallel import DistributedDataParallel as DDP
 from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
 from torch.distributed.fsdp.wrap import (
-    size_based_auto_wrap_policy,
+    transformer_auto_wrap_policy,
     enable_wrap,
     wrap,
 )
@@ -161,7 +162,8 @@ def main(args):
         if args.fsdp:
             #wrap policy
             my_auto_wrap_policy = functools.partial(
-                size_based_auto_wrap_policy, min_num_params=20000
+                transformer_auto_wrap_policy,
+                transformer_layer_cls={Block},
             )
             training_model = FSDP(mae_model.to(local_rank), auto_wrap_policy=my_auto_wrap_policy)
         else:
